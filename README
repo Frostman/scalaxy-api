@@ -1,0 +1,6 @@
+---- Scalaxy.ru API implementation for Java ----
+Simple API implementation based on Apache HTTP Client
+
+---- RoadMap ----
+Implement all scalaxy objects to work not with json objects
+but with Java objects. 

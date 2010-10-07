@@ -24,7 +24,7 @@ public enum ScalaxyAction {
     CREATE_VM("https://www.scalaxy.ru/api/projects/{project_id}/instances.json", POST, SC_201),
     GET_VMS_LIST("https://www.scalaxy.ru/api/projects/{project_id}/instances.json", GET, SC_200),
     GET_VM("https://www.scalaxy.ru/api/projects/{project_id}/instances/{instance_id}.json", GET, SC_200),
-    START_VM("https://www.scalaxy.ru/api/projects/{project_id}/instances/{instnace_id}/run.json", PUT, SC_200),
+    START_VM("https://www.scalaxy.ru/api/projects/{project_id}/instances/{instance_id}/run.json", PUT, SC_200),
     RESTART_VM("https://www.scalaxy.ru/api/projects/{project_id}/instances/{instance_id}/reboot.json", PUT, SC_200),
     STOP_VM("https://www.scalaxy.ru/api/projects/{project_id}/instances/{instance_id}/terminate.json", PUT, SC_200),
     RESIZE_VM("https://www.scalaxy.ru/api/projects/{project_id}/instances/{instance_id}/resize.json", PUT, SC_200),

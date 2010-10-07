@@ -2,9 +2,12 @@ package ru.frostman.util.scalaxy;
 
 import org.apache.commons.httpclient.*;
 import org.apache.commons.httpclient.auth.AuthScope;
+import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.PutMethod;
 import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
@@ -17,8 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static ru.frostman.util.scalaxy.ScalaxyAction.*;
-import static ru.frostman.util.scalaxy.helpers.RequestMethod.GET;
-import static ru.frostman.util.scalaxy.helpers.RequestMethod.POST;
+import static ru.frostman.util.scalaxy.helpers.RequestMethod.*;
 
 /**
  * Main class of Scalaxy API for Java implementation.
@@ -45,11 +47,94 @@ public class Scalaxy {
         return execute(GET_PROJECTS_LIST, null, null);
     }
 
-    public ScalaxyResponse getProjectAsResponse(String id) throws ScalaxyException {
+    public ScalaxyResponse createProjectAsResponse(String name) throws ScalaxyException {
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("name", name);
+
+        return execute(CREATE_PROJECT, params, null);
+    }
+
+    public ScalaxyResponse getProjectAsResponse(String projectId) throws ScalaxyException {
         Map<String, String> urlParams = new HashMap<String, String>();
-        urlParams.put("project_id", id);
+        urlParams.put("project_id", projectId);
 
         return execute(GET_PROJECT, null, urlParams);
+    }
+
+    public ScalaxyResponse deleteProjectAsResponse(String projectId) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+
+        return execute(DELETE_PROJECT, null, urlParams);
+    }
+
+    public ScalaxyResponse getVirtualMachinesListAsResponse(String projectId) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+
+        return execute(GET_VMS_LIST, null, urlParams);
+    }
+
+    public ScalaxyResponse getVirtualMachineAsResponse(String projectId, String instanceId) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+        urlParams.put("instance_id", instanceId);
+
+        return execute(GET_VM, null, urlParams);
+    }
+
+    public ScalaxyResponse startVirtualMachineAsResponse(String projectId, String instanceId) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+        urlParams.put("instance_id", instanceId);
+
+        return execute(START_VM, null, urlParams);
+    }
+
+    public ScalaxyResponse restartVirtualMachineAsResponse(String projectId, String instanceId) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+        urlParams.put("instance_id", instanceId);
+
+        return execute(RESTART_VM, null, urlParams);
+    }
+
+    public ScalaxyResponse stopVirtualMachineAsResponse(String projectId, String instanceId) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+        urlParams.put("instance_id", instanceId);
+
+        return execute(STOP_VM, null, urlParams);
+    }
+
+    public ScalaxyResponse resizeVirtualMachineAsResponse(String projectId, String instanceId, String newSize) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+        urlParams.put("instance_id", instanceId);
+
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("slots", newSize);
+
+        return execute(RESIZE_VM, params, urlParams);
+    }
+
+     public ScalaxyResponse renameVirtualMachineAsResponse(String projectId, String instanceId, String newName) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+        urlParams.put("instance_id", instanceId);
+
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("name", newName);
+
+        return execute(RENAME_VM, params, urlParams);
+    }
+
+    public ScalaxyResponse deleteVirtualMachineAsResponse(String projectId, String instanceId) throws ScalaxyException {
+        Map<String, String> urlParams = new HashMap<String, String>();
+        urlParams.put("project_id", projectId);
+        urlParams.put("instance_id", instanceId);
+
+        return execute(DELETE_VM, null, urlParams);
     }
 
     private ScalaxyResponse execute(ScalaxyAction action, Map<String, String> params, Map<String, String> urlParams) throws ScalaxyException {
@@ -61,8 +146,22 @@ public class Scalaxy {
             request = new GetMethod(url);
         } else if (method == POST) {
             PostMethod tmp = new PostMethod(url);
+            tmp.setRequestHeader("Content-Type", "application/json");
             if (params != null) {
-                tmp.setRequestBody(mapToNameValuePairs(params));
+                tmp.setRequestBody(new NameValuePair[]{
+                        new NameValuePair("JSON", mapToNameValuePairs(params).toJSONString())
+                });
+            }
+
+            request = tmp;
+        } else if (method == DELETE) {
+            request = new DeleteMethod(url);
+        } else if (method == PUT) {
+            PutMethod tmp = new PutMethod(url);
+            tmp.setRequestHeader("Content-Type", "application/json");
+            if (params != null) {
+                //todo find better way to set body                
+                tmp.setRequestBody(mapToNameValuePairs(params).toJSONString());
             }
 
             request = tmp;
@@ -74,17 +173,18 @@ public class Scalaxy {
 
         try {
             ScalaxyStatus status = ScalaxyStatus.getByHttpStatus(client.executeMethod(request));
-            JSONParser parser = new JSONParser();
+
             JSONArray array = null;
-            if (status.equals(action.getSuccessStatus())) {                
-                array = (JSONArray) parser.parse(request.getResponseBodyAsString());
+            if (status.equals(action.getSuccessStatus())) {
+                array = parseJSON(request.getResponseBodyAsString());
             } else {
                 try {
-                    array = (JSONArray) parser.parse(request.getResponseBodyAsString());
+                    array = parseJSON(request.getResponseBodyAsString());
                 } catch (ParseException e) {
                     // no operation
                 }
             }
+
             return new ScalaxyResponse(array, status, status.equals(action.getSuccessStatus()));
         } catch (HttpException e) {
             throw new ScalaxyException(e);
@@ -97,29 +197,30 @@ public class Scalaxy {
         }
     }
 
-    private NameValuePair[] mapToNameValuePairs(Map<String, String> params) {
+    private JSONObject mapToNameValuePairs(Map<String, String> params) {
         if (params == null) {
             return null;
         }
-
+        JSONObject json = new JSONObject();
         Set<Map.Entry<String, String>> entrySet = params.entrySet();
-        NameValuePair[] data = new NameValuePair[entrySet.size()];
-        int i = 0;
+
         for (Map.Entry<String, String> entry : entrySet) {
-            data[i++] = new NameValuePair(entry.getKey(), entry.getValue());
+            json.put(entry.getKey(), entry.getValue());
         }
 
-        return data;
+        return json;
     }
 
-    private static String responseToString(ScalaxyResponse response) {
-        StringBuilder result = new StringBuilder();
-        if (response.isSuccess()) {
-            result.append("[SUCCESS] ").append(response.getData().toJSONString());
-        } else {
-            result.append("[FAIL] ").append(response.getStatus()).append(":").append(response.getStatus().getDescription());
-        }
+    private static JSONArray parseJSON(String str) throws ParseException {
+        JSONParser parser = new JSONParser();
+        Object obj = parser.parse(str);
+        if (obj instanceof JSONObject) {
+            JSONArray array = new JSONArray();
+            array.add(obj);
 
-        return result.toString();
+            return array;
+        } else {
+            return (JSONArray) obj;
+        }
     }
 }
